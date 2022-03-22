@@ -6,7 +6,7 @@ with open('README.md') as f:
 
 setup(
     name='tpp',
-    version='0.0.2',
+    version='0.0.3',
     description='Playing around with TPPs.',
     long_description=readme,
     author='Babylon ML team',
