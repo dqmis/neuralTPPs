@@ -99,6 +99,7 @@ def get_model(
     multi_labels: bool,
     include_poisson: bool,
     use_coefficients: bool,
+    device
 ) -> EncDecProcess:
     encoder_decoder_args["decoder_units_mlp"] = encoder_decoder_args[
         "decoder_units_mlp"
