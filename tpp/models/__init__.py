@@ -1,4 +1,5 @@
 from argparse import Namespace
+from typing import Dict
 from torch import nn
 from pprint import pprint
 
@@ -26,7 +27,9 @@ from tpp.models.decoders.poisson import PoissonDecoder
 from tpp.models.decoders.rmtpp import RMTPPDecoder
 from tpp.models.decoders.rmtpp_cm import RMTPPCmDecoder
 from tpp.models.decoders.self_attention_cm import SelfAttentionCmDecoder
-from tpp.models.decoders.self_attention_simple_cm import SelfAttentionCmDecoder as SelfAttentionSimpleCmDecoder
+from tpp.models.decoders.self_attention_simple_cm import (
+    SelfAttentionCmDecoder as SelfAttentionSimpleCmDecoder,
+)
 from tpp.models.decoders.self_attention_mc import SelfAttentionMCDecoder
 
 ENCODER_CLASSES = {
@@ -35,7 +38,8 @@ ENCODER_CLASSES = {
     "mlp-fixed": MLPFixedEncoder,
     "mlp-variable": MLPVariableEncoder,
     "stub": StubEncoder,
-    "selfattention": SelfAttentionEncoder}
+    "selfattention": SelfAttentionEncoder,
+}
 DECODER_CLASSES = {
     "conditional-poisson": ConditionalPoissonDecoder,
     "conditional-poisson-cm": ConditionalPoissonCMDecoder,
@@ -49,7 +53,8 @@ DECODER_CLASSES = {
     "rmtpp-cm": RMTPPCmDecoder,
     "selfattention-cm": SelfAttentionCmDecoder,
     "selfattention-simple-cm": SelfAttentionSimpleCmDecoder,
-    "selfattention-mc": SelfAttentionMCDecoder}
+    "selfattention-mc": SelfAttentionMCDecoder,
+}
 
 ENCODER_NAMES = sorted(list(ENCODER_CLASSES.keys()))
 DECODER_NAMES = sorted(list(DECODER_CLASSES.keys()))
@@ -59,21 +64,23 @@ NAMES = {"encoder": ENCODER_NAMES, "decoder": DECODER_NAMES}
 
 
 def instantiate_encoder_or_decoder(
-        args: Namespace, component="encoder") -> nn.Module:
+    args: Dict, marks: int, component="encoder"
+) -> nn.Module:
     assert component in {"encoder", "decoder"}
 
     prefix, classes = component + "_", CLASSES[component]
 
-    kwargs = {
-        k[len(prefix):]: v for
-        k, v in args.__dict__.items() if k.startswith(prefix)}
-    kwargs["marks"] = args.marks
+    kwargs = {k[len(prefix) :]: v for k, v in args.items() if k.startswith(prefix)}
+    kwargs["marks"] = marks
 
-    name = args.__dict__[component]
+    name = args[component]
 
     if name not in classes:
-        raise ValueError("Unknown {} class {}. Must be one of {}.".format(
-            component, name, NAMES[component]))
+        raise ValueError(
+            "Unknown {} class {}. Must be one of {}.".format(
+                component, name, NAMES[component]
+            )
+        )
 
     component_class = classes[name]
     component_instance = component_class(**kwargs)
@@ -86,27 +93,39 @@ def instantiate_encoder_or_decoder(
     return component_instance
 
 
-def get_model(args: Namespace) -> EncDecProcess:
-    args.decoder_units_mlp = args.decoder_units_mlp + [args.marks]
+def get_model(
+    encoder_decoder_args: Dict,
+    marks: int,
+    multi_labels: bool,
+    include_poisson: bool,
+    use_coefficients: bool,
+) -> EncDecProcess:
+    encoder_decoder_args["decoder_units_mlp"] = encoder_decoder_args[
+        "decoder_units_mlp"
+    ] + [marks]
 
     decoder: Decoder
-    decoder = instantiate_encoder_or_decoder(args, component="decoder")
+    decoder = instantiate_encoder_or_decoder(
+        encoder_decoder_args, marks, component="decoder"
+    )
 
     if decoder.input_size is not None:
-        args.encoder_units_mlp = args.encoder_units_mlp + [decoder.input_size]
+        encoder_decoder_args["encoder_units_mlp"] = encoder_decoder_args[
+            "encoder_units_mlp"
+        ] + [decoder.input_size]
 
     encoder: Encoder
-    encoder = instantiate_encoder_or_decoder(args, component="encoder")
+    encoder = instantiate_encoder_or_decoder(
+        encoder_decoder_args, marks, component="encoder"
+    )
 
-    process = EncDecProcess(
-        encoder=encoder, decoder=decoder, multi_labels=args.multi_labels)
+    process = EncDecProcess(encoder=encoder, decoder=decoder, multi_labels=multi_labels)
 
-    if args.include_poisson:
+    if include_poisson:
         processes = {process.name: process}
         processes.update({"poisson": PoissonProcess(marks=process.marks)})
-        process = ModularProcess(
-            processes=processes, use_coefficients=args.use_coefficients)
+        process = ModularProcess(processes=processes, use_coefficients=use_coefficients)
 
-    process = process.to(device=args.device)
+    process = process.to(device=device)
 
     return process
