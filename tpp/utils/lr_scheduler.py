@@ -4,63 +4,56 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import _LRScheduler
 
 
-def create_lr_scheduler(optimizer, args):
+def create_lr_scheduler(optimizer,
+        lr_scheduler: str,
+        lr_scheduler_patience: int = 1,
+        lr_scheduler_milestones: float = 1.0,
+        lr_rate_init: float = 1.0,
+        lr_scheduler_step_size: int = 1,
+        max_epochs: int = 1,
+        max_steps: int = 1,
+        lr_scheduler_gamma: float = 1.0,
+        lr_scheduler_warmup: int = 1
+    ):
     if not isinstance(optimizer, optim.Optimizer):
-        # assume FP16_Optimizer
         optimizer = optimizer.optimizer
 
-    if args.lr_scheduler == 'plateau':
+    if lr_scheduler == 'plateau':
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
-            # NB This threshold is (not) used so that we only change lr if
-            # there is a significant difference.
             threshold=0,
-            patience=args.lr_scheduler_patience,
-            factor=args.lr_scheduler_gamma)
-    elif args.lr_scheduler == 'step':
-        step_size = args.lr_scheduler_step_size
-        gamma = args.lr_scheduler_gamma
+            patience=lr_scheduler_patience,
+            factor=lr_scheduler_gamma)
+    elif lr_scheduler == 'step':
         lr_scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=step_size, gamma=gamma)
-    elif args.lr_scheduler == 'cos':
-        max_epochs = args.max_epochs
+            optimizer, lr_scheduler_step_size=lr_scheduler_step_size, gamma=lr_scheduler_gamma)
+    elif lr_scheduler == 'cos':
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, max_epochs)
-    elif args.lr_scheduler == 'milestones':
-        milestones = args.lr_scheduler_milestones
-        gamma = args.lr_scheduler_gamma
+    elif lr_scheduler == 'milestones':
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer, milestones=milestones, gamma=gamma)
-    elif args.lr_scheduler == 'findlr':
-        max_steps = args.max_steps
+            optimizer, milestones=lr_scheduler_milestones, gamma=lr_scheduler_gamma)
+    elif lr_scheduler == 'findlr':
         lr_scheduler = FindLR(optimizer, max_steps)
-    elif args.lr_scheduler == 'noam':
-        warmup_steps = args.lr_scheduler_warmup
-        lr_scheduler = NoamLR(optimizer, warmup_steps=warmup_steps)
-    elif args.lr_scheduler == "clr":
-        step_size = args.lr_scheduler_step_size
-        learning_rate = args.lr_rate_init
-        lr_scheduler_gamma = args.lr_scheduler_gamma
-        mode = "exp_range"
+    elif lr_scheduler == 'noam':
+        lr_scheduler = NoamLR(optimizer, warmup_steps=lr_scheduler_warmup)
+    elif lr_scheduler == "clr":
         lr_scheduler = torch.optim.lr_scheduler.CyclicLR(
             optimizer,
-            base_lr=learning_rate * 1.e-2,
-            max_lr=learning_rate,
-            step_size_up=step_size,
-            step_size_down=step_size,
-            mode=mode,
+            base_lr=lr_rate_init * 1.e-2,
+            max_lr=lr_rate_init,
+            step_size_up=lr_scheduler_step_size,
+            step_size_down=lr_scheduler_step_size,
+            mode="exp_range",
             cycle_momentum=False,
             gamma=lr_scheduler_gamma)
-    elif args.lr_scheduler == 'calr':
-        step_size = args.lr_scheduler_step_size
-        learning_rate = args.lr_rate_init
-        lr_scheduler_gamma = args.lr_scheduler_gamma
+    elif lr_scheduler == 'calr':
         lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer,
-            T_max=step_size,
-            eta_min=learning_rate * lr_scheduler_gamma)
+            T_max=lr_scheduler_step_size,
+            eta_min=lr_rate_init * lr_scheduler_gamma)
     else:
-        raise NotImplementedError("unknown lr_scheduler " + args.lr_scheduler)
+        raise NotImplementedError("unknown lr_scheduler " + lr_scheduler)
     return lr_scheduler
 
 
