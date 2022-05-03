@@ -50,6 +50,8 @@ class SelfAttentionEncoder(VariableHistoryEncoder):
             dropout_mlp: Optional[float] = 0.,
             constraint_mlp: Optional[str] = None,
             activation_final_mlp: Optional[str] = None,
+            # Additional features size
+            af_size: Optional[int] = None,
             # Transformer
             units_rnn: Optional[int] = 16,
             layers_rnn: Optional[int] = 1,
@@ -88,15 +90,20 @@ class SelfAttentionEncoder(VariableHistoryEncoder):
         self.transformer_encoder = TransformerEncoderNetwork(
             encoder_layer=encoder_layer,
             num_layers=layers_rnn)
+        if af_size is None:
+            af_size = 0
+            self.use_af = False
+        else:
+            self.use_af = True
         self.mlp = MLP(
             units=units_mlp,
             activations=activation_mlp,
             constraint=constraint_mlp,
             dropout_rates=dropout_mlp,
-            input_shape=self.encoding_size,
+            input_shape=self.encoding_size + af_size,
             activation_final=activation_final_mlp)
 
-    def forward(self, events: Events) -> Tuple[th.Tensor, th.Tensor, Dict]:
+    def forward(self, events: Events, af: Optional[th.tensor] = None) -> Tuple[th.Tensor, th.Tensor, Dict]:
         """Compute the (query time independent) event representations.
 
         Args:
@@ -133,6 +140,9 @@ class SelfAttentionEncoder(VariableHistoryEncoder):
         hidden = hidden.transpose(0, 1)
 
         hidden = F.normalize(hidden, dim=-1, p=2)
+        if self.use_af:
+            af = af.unsqueeze(1).repeat(1, hidden.shape[1], 1)
+            hidden = th.cat([hidden, af], axis=-1)
         outputs = self.mlp(hidden)  # [B,L,output_size]
 
         artifacts = {'encoder': {"attention_weights": attn_weights}}

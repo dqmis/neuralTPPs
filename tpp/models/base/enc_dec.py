@@ -46,7 +46,7 @@ class EncDecProcess(Process):
             self.enc_dec_hidden_size = self.encoder.output_size
 
     def intensity(
-            self, query: th.Tensor, events: Events
+            self, query: th.Tensor, events: Events, af: Optional[th.tensor] = None
     ) -> Tuple[th.Tensor, th.Tensor]:
         """Compute the intensities at query times given events.
 
@@ -63,11 +63,11 @@ class EncDecProcess(Process):
 
         """
         log_intensity, _, intensity_mask, _ = self.artifacts(
-            query=query, events=events)
+            query=query, events=events, af=af)
         return th.exp(log_intensity), intensity_mask
 
     def log_density(
-            self, query: th.Tensor, events: Events
+            self, query: th.Tensor, events: Events, af: Optional[th.tensor] = None
     ) -> Tuple[th.Tensor, th.Tensor]:
         """Compute the log densities at query times given events.
 
@@ -85,12 +85,12 @@ class EncDecProcess(Process):
         """
         # TODO: Intensity integral should be summed over marks.
         log_intensity, intensity_integral, intensity_mask, _ = self.artifacts(
-            query=query, events=events)
+            query=query, events=events, af=af)
         log_density = log_intensity - intensity_integral.sum(-1).unsqueeze(-1)
         return log_density, intensity_mask
 
     def neg_log_likelihood(
-            self, events: Events) -> Tuple[th.Tensor, th.Tensor, Dict]:
+            self, events: Events, af: Optional[th.tensor] = None) -> Tuple[th.Tensor, th.Tensor, Dict]:
         """Compute the negative log likelihood of events.
 
         Args:
@@ -107,7 +107,7 @@ class EncDecProcess(Process):
         events_times = events.get_times(postpend_window=True)         # [B,L+1]
 
         log_intensity, intensity_integral, intensity_mask, _ = self.artifacts(
-            query=events_times, events=events)  # [B,L+1,M], [B,L+1,M], [B,L+1]
+            query=events_times, events=events, af=af)  # [B,L+1,M], [B,L+1,M], [B,L+1]
 
         # For the interval normalisation
         shift = 1. + th.max(events_times) - th.min(events_times)
@@ -180,7 +180,7 @@ class EncDecProcess(Process):
         return nll, nll_mask, artifacts
 
     def artifacts(
-            self, query: th.Tensor, events: Events
+            self, query: th.Tensor, events: Events, af: Optional[th.tensor] = None
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, Dict]:
         """Compute the (log) intensities and intensity integrals at query times
         given events.
@@ -201,7 +201,7 @@ class EncDecProcess(Process):
 
         """
         representations, representations_mask, artifacts = self.encode(
-            events=events)                            # [B,L+1,D] [B,L+1], Dict
+            events=events, af=af)                            # [B,L+1,D] [B,L+1], Dict
 
         prev_times, is_event, pos_delta_mask = get_prev_times(
             query=query,
@@ -220,8 +220,10 @@ class EncDecProcess(Process):
             representations_mask=representations_mask,
             artifacts=artifacts)
 
-    def encode(self, events: Events) -> Tuple[th.Tensor, th.Tensor, Dict]:
-        return self.encoder(events=events)
+    def encode(self, events: Events, af: Optional[th.tensor] = None) -> Tuple[th.Tensor, th.Tensor, Dict]:
+        if af is None:
+            return self.encoder(events=events)
+        return self.encoder(events=events, af=af)
 
     def decode(
             self,
