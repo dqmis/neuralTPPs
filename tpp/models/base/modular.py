@@ -57,7 +57,7 @@ class ModularProcess(EncDecProcess):
             nn.init.uniform_(self.alpha)
 
     def artifacts(
-            self, query: th.Tensor, events: Events, af: Optional[th.tensort] = None
+            self, query: th.Tensor, events: Events, af: Optional[th.tensor] = None
     ) -> Tuple[th.Tensor, th.Tensor, th.Tensor, Dict]:
         """Compute the (log) intensities and intensity integrals at query times
         given events.
