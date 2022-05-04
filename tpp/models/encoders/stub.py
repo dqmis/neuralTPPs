@@ -1,3 +1,4 @@
+from lib2to3.pgen2.token import OP
 import torch as th
 
 from typing import Dict, Optional, Tuple
@@ -18,5 +19,5 @@ class StubEncoder(Encoder):
         super(StubEncoder, self).__init__(
             name="stub", output_size=0, marks=marks, **kwargs)
 
-    def forward(self, events: Events) -> Tuple[th.Tensor, th.Tensor, Dict]:
+    def forward(self, events: Events, af: Optional[th.tensor] = None) -> Tuple[th.Tensor, th.Tensor, Dict]:
         return th.Tensor(), th.Tensor(), dict()
